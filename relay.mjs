@@ -17,7 +17,7 @@ const server = http.createServer(async (req, res) => {
     return res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ ok: true }))
   }
   if (!apiKey) return res.writeHead(500, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: 'OPENAI_API_KEY is not configured' }))
-  if (req.method !== 'POST' || !['/v1/audio/transcriptions', '/v1/chat/completions', '/audio/transcriptions', '/chat/completions'].includes(req.url || '')) {
+  if (req.method !== 'POST' || !['/v1/audio/transcriptions', '/v1/chat/completions', '/v1/responses', '/v1/embeddings', '/audio/transcriptions', '/chat/completions', '/responses', '/embeddings'].includes(req.url || '')) {
     return res.writeHead(404).end('Not found')
   }
   const chunks = []

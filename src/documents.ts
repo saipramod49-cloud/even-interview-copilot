@@ -1,4 +1,4 @@
-import type { PrepDocument } from './types'
+import type { PrepDocument, ProviderSettings } from './types'
 
 const MAX_DOCUMENT_CHARS = 120_000
 
@@ -65,6 +65,72 @@ export function relevantPrepContext(question: string, documents: PrepDocument[])
     .map(chunk => `[${chunk.source}] ${chunk.text}`)
     .join('\n\n')
     .slice(0, 5_500)
+}
+
+export async function semanticPrepContext(
+  question: string,
+  documents: PrepDocument[],
+  settings: ProviderSettings,
+): Promise<string> {
+  if (!documents.length) return ''
+  const candidates = rankedChunks(question, documents).slice(0, 32)
+  try {
+    const response = await fetch(`${settings.llmBaseUrl.replace(/\/$/, '')}/embeddings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(settings.apiKey ? { Authorization: `Bearer ${settings.apiKey}` } : {}),
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-3-small',
+        input: [question, ...candidates.map(candidate => candidate.text)],
+      }),
+    })
+    if (!response.ok) throw new Error(`Embedding service returned ${response.status}`)
+    const payload = await response.json() as { data?: Array<{ index: number; embedding: number[] }> }
+    const vectors = [...(payload.data ?? [])].sort((a, b) => a.index - b.index)
+    const questionVector = vectors[0]?.embedding
+    if (!questionVector || vectors.length !== candidates.length + 1) throw new Error('Incomplete embeddings')
+    return candidates
+      .map((candidate, index) => ({ ...candidate, semanticScore: cosine(questionVector, vectors[index + 1].embedding) }))
+      .sort((a, b) => b.semanticScore - a.semanticScore)
+      .slice(0, 5)
+      .map(chunk => `[${chunk.source}] ${chunk.text}`)
+      .join('\n\n')
+      .slice(0, 5_500)
+  } catch {
+    return relevantPrepContext(question, documents)
+  }
+}
+
+function rankedChunks(question: string, documents: PrepDocument[]) {
+  const terms = new Set(question.toLowerCase().match(/[a-z0-9+#.]{3,}/g)?.filter(term => !STOP_WORDS.has(term)) ?? [])
+  return documents.flatMap(document => document.text
+    .split(/\n{2,}|(?<=[.!?])\s+(?=[A-Z])/)
+    .reduce<string[]>((parts, paragraph) => {
+      const last = parts.at(-1)
+      if (last && last.length + paragraph.length < 900) parts[parts.length - 1] = `${last} ${paragraph}`
+      else if (paragraph.trim()) parts.push(paragraph.trim())
+      return parts
+    }, [])
+    .map(text => ({
+      source: document.name,
+      text,
+      lexicalScore: [...terms].reduce((score, term) => score + (text.toLowerCase().includes(term) ? 1 : 0), 0),
+    })))
+    .sort((a, b) => b.lexicalScore - a.lexicalScore || b.text.length - a.text.length)
+}
+
+function cosine(a: number[], b: number[]) {
+  let dot = 0
+  let normA = 0
+  let normB = 0
+  for (let index = 0; index < Math.min(a.length, b.length); index += 1) {
+    dot += a[index] * b[index]
+    normA += a[index] ** 2
+    normB += b[index] ** 2
+  }
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB) || 1)
 }
 
 const STOP_WORDS = new Set([

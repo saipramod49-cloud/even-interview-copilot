@@ -48,32 +48,39 @@ export async function generateAnswer(
   settings: ProviderSettings,
   signal?: AbortSignal,
 ): Promise<string> {
-  const response = await fetch(endpoint(settings.llmBaseUrl, '/chat/completions'), {
+  const instructions = `You are a discreet interview response coach for a candidate with about two years of experience. Answer directly in natural, simple language the candidate can understand at a glance and say aloud. Use uploaded resume/prep evidence first for personal or project questions, and use web search only to strengthen current technical or industry context. Never invent the candidate's experience, tools, metrics, or ownership. Keep the complete response at 100 words or fewer. Write 2-3 short sentences, then on a new line write KEYWORDS: followed by 3-5 short **bold keywords** separated by |. Do not include URLs, citations, preambles, or clarification questions unless the question is genuinely impossible to interpret.`
+  const input = `INTERVIEW QUESTION:\n${question}\n\nRELEVANT RESUME/PREP NOTES:\n${context || '(No relevant notes uploaded.)'}\n\nRECENT CONVERSATION:\n${recentConversation || '(None)'}`
+  const response = await fetch(endpoint(settings.llmBaseUrl, '/responses'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...headers(settings) },
     signal,
     body: JSON.stringify({
       model: settings.llmModel,
-      ...(settings.llmModel.startsWith('gpt-5')
-        ? { reasoning_effort: 'none', max_completion_tokens: 180 }
-        : { temperature: 0.25, max_tokens: 180 }),
-      messages: [
-        {
-          role: 'system',
-          content: `You are a discreet interview response coach. Answer the interviewer directly and naturally. Return exactly ${settings.answerSentences} short sentences, direct and specific. For factual or technical questions, answer from reliable general knowledge even when the supplied context is empty; expand standard acronyms on first use (for example, GCP means Google Cloud Platform). Use first person only for personal or behavioral questions. When the supplied resume/prep context mentions the same company, project, tool, or term as the question, you MUST use those specific details and answer as the candidate's project experience; do not replace them with a generic checklist. Ground claims about the candidate's own experience in the supplied context; never invent experience or metrics. Do not ask for clarification unless the question is genuinely ambiguous between multiple common meanings. Put the 2-4 most useful keywords inside **double asterisks**. Output only the answer.`,
-        },
-        {
-          role: 'user',
-          content: `INTERVIEW QUESTION:\n${question}\n\nRELEVANT RESUME/PREP NOTES:\n${context || '(No relevant notes uploaded.)'}\n\nRECENT CONVERSATION:\n${recentConversation || '(None)'}`,
-        },
-      ],
+      instructions,
+      input,
+      tools: [{ type: 'web_search_preview', search_context_size: 'low' }],
+      tool_choice: 'auto',
+      max_output_tokens: 220,
+      store: false,
     }),
   })
   if (!response.ok) throw new Error(`Language model returned ${response.status}: ${await response.text()}`)
-  const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> }
-  const answer = data.choices?.[0]?.message?.content?.trim()
+  const data = await response.json() as {
+    output_text?: string
+    output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>
+  }
+  const answer = (data.output_text || data.output
+    ?.flatMap(item => item.content ?? [])
+    .filter(item => item.type === 'output_text')
+    .map(item => item.text ?? '')
+    .join('\n'))?.trim()
   if (!answer) throw new Error('The language model returned an empty answer.')
-  return answer
+  return capWords(answer, 100)
+}
+
+function capWords(value: string, maxWords: number) {
+  const words = value.split(/\s+/)
+  return words.length <= maxWords ? value : `${words.slice(0, maxWords).join(' ')}…`
 }
 
 function pcmToWav(pcm: Uint8Array): ArrayBuffer {

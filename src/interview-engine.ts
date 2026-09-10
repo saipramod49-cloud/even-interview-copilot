@@ -1,4 +1,4 @@
-import { relevantPrepContext } from './documents'
+import { semanticPrepContext } from './documents'
 import { generateAnswer } from './providers'
 import type { PrepDocument, ProviderSettings, TranscriptSegment } from './types'
 
@@ -43,7 +43,7 @@ export class InterviewEngine {
     try {
       const answer = await generateAnswer(
         question,
-        relevantPrepContext(question, this.documents),
+        await semanticPrepContext(question, this.documents, this.settings),
         this.conversation.slice(-8).map(item => `${item.speaker || 'speaker'}: ${item.text}`).join('\n'),
         this.settings,
         this.answerRequest.signal,
@@ -76,7 +76,8 @@ export function formatForGlasses(markdown: string) {
   return markdown
     .replace(/\*\*([^*]+)\*\*/g, (_, keyword: string) => keyword.toUpperCase())
     .replace(/[*_#`]/g, '')
-    .replace(/\s+/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{2,}/g, '\n')
     .trim()
     .slice(0, 620)
 }
