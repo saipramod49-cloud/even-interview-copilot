@@ -58,7 +58,11 @@ export function mountUi(settings: ProviderSettings, documents: PrepDocument[], a
   }
   byId('start').onclick = () => { actions.onSave(readSettings()); actions.onStart() }
   byId('stop').onclick = actions.onStop
-  byId<HTMLInputElement>('files').onchange = event => actions.onFiles([...((event.target as HTMLInputElement).files ?? [])])
+  byId<HTMLInputElement>('files').onchange = event => {
+    const input = event.target as HTMLInputElement
+    void actions.onFiles([...(input.files ?? [])])
+    input.value = ''
+  }
 
   const renderDocuments = (docs: PrepDocument[]) => {
     byId('doc-count').textContent = String(docs.length)

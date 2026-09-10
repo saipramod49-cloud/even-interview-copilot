@@ -32,7 +32,7 @@ export async function readPrepFile(file: File): Promise<PrepDocument> {
   if (!text) throw new Error(`No readable text found in ${file.name}`)
 
   return {
-    id: crypto.randomUUID(),
+    id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     name: file.name,
     text,
     addedAt: Date.now(),

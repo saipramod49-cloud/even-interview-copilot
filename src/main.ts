@@ -46,16 +46,20 @@ const ui = mountUi(settings, documents, {
   onStart: start,
   onStop: stop,
   async onFiles(files) {
-    try {
-      ui.setStatus('connecting', 'Reading files')
-      const added = await Promise.all(files.map(readPrepFile))
+    ui.setStatus('connecting', 'Reading files')
+    const results = await Promise.allSettled(files.map(readPrepFile))
+    const added = results.flatMap(result => result.status === 'fulfilled' ? [result.value] : [])
+    const failed = results.flatMap((result, index) => result.status === 'rejected' ? [`${files[index].name}: ${(result.reason as Error).message}`] : [])
+    if (added.length) {
       documents = [...documents, ...added]
       saveDocuments(documents)
       engine.update(settings, documents)
       ui.renderDocuments(documents)
+    }
+    if (failed.length) {
+      ui.setStatus('error', `${added.length} added; ${failed[0]}`)
+    } else {
       ui.setStatus(running ? 'listening' : 'setup', `${added.length} added`)
-    } catch (error) {
-      ui.setStatus('error', (error as Error).message)
     }
   },
   onRemoveDocument(id) {
