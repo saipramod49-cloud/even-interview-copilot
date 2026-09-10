@@ -45,9 +45,9 @@ export function mountUi(settings: ProviderSettings, documents: PrepDocument[], a
   })
   byId('save').onclick = () => actions.onSave(readSettings())
   byId('openai-preset').onclick = () => {
-    byId<HTMLInputElement>('stt-url').value = 'https://api.openai.com/v1'
+    byId<HTMLInputElement>('stt-url').value = 'https://even-interview-copilot.onrender.com/v1'
     byId<HTMLInputElement>('stt-model').value = 'gpt-4o-transcribe-diarize'
-    byId<HTMLInputElement>('llm-url').value = 'https://api.openai.com/v1'
+    byId<HTMLInputElement>('llm-url').value = 'https://even-interview-copilot.onrender.com/v1'
     byId<HTMLInputElement>('llm-model').value = 'gpt-5.6-luna'
   }
   byId('local-preset').onclick = () => {

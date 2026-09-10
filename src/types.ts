@@ -25,9 +25,9 @@ export type PrepDocument = {
 export type AppStatus = 'setup' | 'connecting' | 'listening' | 'thinking' | 'paused' | 'error'
 
 export const DEFAULT_SETTINGS: ProviderSettings = {
-  sttBaseUrl: 'https://api.openai.com/v1',
+  sttBaseUrl: 'https://even-interview-copilot.onrender.com/v1',
   sttModel: 'gpt-4o-transcribe-diarize',
-  llmBaseUrl: 'https://api.openai.com/v1',
+  llmBaseUrl: 'https://even-interview-copilot.onrender.com/v1',
   llmModel: 'gpt-5.6-luna',
   apiKey: '',
   candidateSpeaker: '',
